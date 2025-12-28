@@ -54,13 +54,13 @@ Response: List data laporan.
 - description: (text, minimal 10 karakter)
 - photos[]: (File - Opsional)
 
-## C. Lihat Detail Laporan berdasarkan id laporan
+### C. Lihat Detail Laporan berdasarkan id laporan
 - Method: `GET`
 - Endpoint: `/reports/{id}`
 - Headers: `Authorization: <token>`
 Contoh:` GET /reports/5`
 
-## D. Update Laporan
+### D. Update Laporan
 - Method: `POST`
 - Endpoint: `/reports/{id}`
 - Headers: `Authorization: <token>`
@@ -70,7 +70,7 @@ Contoh:` GET /reports/5`
 - status: (Status baru, misal: Selesai)
 photos[]: (Upload foto baru jika ada)
 
-## E. Hapus Laporan
+### E. Hapus Laporan
 - Method: `DELETE`
 - Endpoint:` /reports/{id}`
 - Headers: `Authorization: <token>`
