@@ -25,193 +25,139 @@ class ReportApiController extends ApiController
     public function index(Request $request): JsonResponse
     {
         try {
-            // API routes are disabled - use web routes at /reports
-            Log::info('API - Reports endpoint disabled');
-
-            return $this->error('Not found', 404);
-
+            $userId = $request->current_user_id;
+            $reports = $this->supabase->getAllReports($userId);
+            return $this->success($reports, 'Data laporan berhasil diambil', 200);
         } catch (\Exception $e) {
-            Log::error('API - Get reports error: ' . $e->getMessage());
-            return $this->error('Failed to retrieve reports', 500);
+            return $this->error('Gagal mengambil data: ' . $e->getMessage(), 500);
         }
     }
 
-    public function show($id): JsonResponse
+    public function show(Request $request, $id): JsonResponse
     {
         try {
+            // 1. Ambil data laporan dari Supabase
             $report = $this->supabase->getReportById($id);
-            
+            // 2. Cek barangnya ada gak?
             if (!$report) {
-                return $this->error('Report not found', 404);
+                return $this->error('Laporan tidak ditemukan', 404);
             }
-
-            $user = Session::get('user');
-            if (!$user || $report['user_id'] != $user['id']) {
-                return $this->error('Unauthorized', 403);
-            }
-
-            Log::info('API - Get report', ['report_id' => $id]);
-
-            return $this->success($report, 'Report retrieved successfully', 200);
-
+            // 3. Langsung kasih datanya
+            return $this->success($report, 'Detail laporan ditemukan', 200);
         } catch (\Exception $e) {
-            Log::error('API - Get report error: ' . $e->getMessage());
-            return $this->error('Failed to retrieve report', 500);
+            return $this->error('Error: ' . $e->getMessage(), 500);
         }
     }
 
     public function store(Request $request): JsonResponse
     {
         try {
-            Log::info('API - Create report started');
-
+            // 1. Validasi Input (Standar)
             $validated = $request->validate([
                 'building_id' => 'required|numeric',
-                'room_id' => 'required|numeric',
+                'room_id'     => 'required|numeric',
                 'facility_id' => 'required|numeric',
                 'description' => 'required|min:10|string',
-                'photos' => 'nullable|array',
-                'photos.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+                'photos'      => 'nullable|array',
+                'photos.*'    => 'nullable|image|max:2048',
             ]);
 
-            $userId = $request->user()->id ?? Session::get('user')['id'] ?? null;
-            
+            // 2. Ambil User ID dari Middleware (HASIL PERBAIKAN KITA TADI)
+            $userId = $request->current_user_id;
             if (!$userId) {
-                return $this->error('Unauthorized', 401);
+                return $this->error('Unauthorized: User ID missing', 401);
             }
 
-            $building = collect($this->supabase->getBuildings())
-                ->where('id', $request->building_id)
-                ->first();
-            
-            if (!$building) {
-                return $this->error('Building not found', 404);
+            // 3. Cari Data Metadata (Gedung, Ruang, Fasilitas)
+            $building = collect($this->supabase->getBuildings())->firstWhere('id', $request->building_id);
+            $room     = collect($this->supabase->getRooms($request->building_id))->firstWhere('id', $request->room_id);
+            $facility = collect($this->supabase->getFacilities())->firstWhere('id', $request->facility_id);
+
+            // Cek kelengkapan data (Fail Fast)
+            if (!$building || !$room || !$facility) {
+                return $this->error('Data gedung, ruangan, atau fasilitas tidak valid', 404);
             }
 
-            $room = collect($this->supabase->getRooms($request->building_id))
-                ->where('id', $request->room_id)
-                ->first();
-            
-            if (!$room) {
-                return $this->error('Room not found', 404);
-            }
-
-            $facility = collect($this->supabase->getFacilities())
-                ->where('id', $request->facility_id)
-                ->first();
-            
-            if (!$facility) {
-                return $this->error('Facility not found', 404);
-            }
-
-            $reportCode = 'LAPORAN-' . str_pad(rand(1, 99999), 5, '0', STR_PAD_LEFT);
-
-            $data = [
-                'user_id' => (int) $userId,
-                'title' => "Kerusakan {$facility['name']} - {$room['name']}",
-                'location' => "{$building['name']}, {$room['name']}",
-                'facility' => $facility['name'],
-                'description' => $request->description,
-                'status' => 'Dikirim',
-                'building_id' => (int) $request->building_id,
-                'room_id' => (int) $request->room_id,
-                'facility_id' => (int) $request->facility_id,
-                'report_code' => $reportCode,
-                'created_at' => Carbon::now()->toIso8601String(),
-                'updated_at' => Carbon::now()->toIso8601String()
-            ];
-
+            // 4. Handle Upload Foto (Kalau ada)
             $photoPaths = [];
             if ($request->hasFile('photos')) {
-                foreach ($request->file('photos') as $index => $photo) {
-                    $filename = time() . '_' . $index . '_' . uniqid() . '.' . $photo->getClientOriginalExtension();
-                    
-                    $uploadPath = public_path('uploads/reports');
-                    if (!file_exists($uploadPath)) {
-                        mkdir($uploadPath, 0755, true);
-                    }
-                    
-                    $photo->move($uploadPath, $filename);
+                foreach ($request->file('photos') as $photo) {
+                    // Nama file unik: time_random.ext
+                    $filename = time() . '_' . uniqid() . '.' . $photo->getClientOriginalExtension();
+                    $photo->move(public_path('uploads/reports'), $filename);
                     $photoPaths[] = '/uploads/reports/' . $filename;
                 }
-                
-                if (!empty($photoPaths)) {
-                    $data['photo_urls'] = json_encode($photoPaths);
-                    $data['photo_url'] = $photoPaths[0];
-                }
             }
 
-            $result = $this->supabase->createReport($data);
+            // 5. Susun Data untuk Supabase
+            $reportData = [
+                'user_id'     => (int) $userId,
+                'title'       => "Kerusakan {$facility['name']} - {$room['name']}",
+                'location'    => "{$building['name']}, {$room['name']}",
+                'facility'    => $facility['name'],
+                'description' => $request->description,
+                'status'      => 'Dikirim',
+                'building_id' => (int) $request->building_id,
+                'room_id'     => (int) $request->room_id,
+                'facility_id' => (int) $request->facility_id,
+                'report_code' => 'LPR-' . strtoupper(uniqid()),
+                'created_at'  => Carbon::now()->toIso8601String(),
+                'updated_at'  => Carbon::now()->toIso8601String(),
+                'photo_urls'  => !empty($photoPaths) ? json_encode($photoPaths) : null,
+                'photo_url'   => !empty($photoPaths) ? $photoPaths[0] : null,
+            ];
+
+            // 6. Kirim ke Supabase
+            $result = $this->supabase->createReport($reportData);
 
             if ($result) {
-                Log::info('API - Report created successfully', ['report_id' => $result['id'] ?? 'N/A']);
-                
-                return $this->success(
-                    $result,
-                    'Report created successfully',
-                    201
-                );
-            } else {
-                Log::error('API - Failed to create report');
-                return $this->error('Failed to create report', 500);
+                return $this->success($result, 'Laporan berhasil dibuat', 201);
             }
 
+            return $this->error('Gagal menyimpan laporan ke database', 500);
         } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('API - Validation error:', ['errors' => $e->errors()]);
-            return $this->error('Validation failed', 422, $e->errors());
-            
+            return $this->error('Validasi gagal', 422, $e->errors());
         } catch (\Exception $e) {
-            Log::error('API - Create report error: ' . $e->getMessage());
-            return $this->error('Server error: ' . $e->getMessage(), 500);
+            Log::error('API Store Error: ' . $e->getMessage());
+            return $this->error('Terjadi kesalahan server: ' . $e->getMessage(), 500);
         }
     }
 
     public function update(Request $request, $id): JsonResponse
     {
         try {
-            Log::info('API - Update report started', ['report_id' => $id]);
-
+            // 1. Cek Laporan Ada & Punya Siapa
             $report = $this->supabase->getReportById($id);
-            
             if (!$report) {
-                return $this->error('Report not found', 404);
+                return $this->error('Laporan tidak ditemukan', 404);
             }
 
-            $user = Session::get('user');
-            if (!$user || $report['user_id'] != $user['id']) {
-                return $this->error('Unauthorized', 403);
+            $userId = $request->current_user_id;
+            if ($report['user_id'] != $userId) {
+                return $this->error('Unauthorized: Anda tidak berhak mengedit laporan ini', 403);
             }
 
+            // 2. Siapkan Data Update
             $updateData = [];
-            
+
+            // Update Deskripsi (Kalau dikirim)
             if ($request->has('description')) {
                 $updateData['description'] = $request->description;
             }
-            
+            // Update Status
             if ($request->has('status')) {
                 $updateData['status'] = $request->status;
             }
 
-
+            // Update Foto (Logic sama kayak Store)
             if ($request->hasFile('photos')) {
                 $photoPaths = [];
-                
-                if (!empty($report['photo_urls'])) {
-                    $photoPaths = json_decode($report['photo_urls'], true) ?? [];
-                }
-
-                foreach ($request->file('photos') as $index => $photo) {
-                    $filename = time() . '_' . $index . '_' . uniqid() . '.' . $photo->getClientOriginalExtension();
-                    
-                    $uploadPath = public_path('uploads/reports');
-                    if (!file_exists($uploadPath)) {
-                        mkdir($uploadPath, 0755, true);
-                    }
-                    
-                    $photo->move($uploadPath, $filename);
+                foreach ($request->file('photos') as $photo) {
+                    $filename = time() . '_' . uniqid() . '.' . $photo->getClientOriginalExtension();
+                    $photo->move(public_path('uploads/reports'), $filename);
                     $photoPaths[] = '/uploads/reports/' . $filename;
                 }
-                
+
                 if (!empty($photoPaths)) {
                     $updateData['photo_urls'] = json_encode($photoPaths);
                     $updateData['photo_url'] = $photoPaths[0];
@@ -220,65 +166,42 @@ class ReportApiController extends ApiController
 
             $updateData['updated_at'] = Carbon::now()->toIso8601String();
 
+            // 3. Kirim ke Supabase
             $result = $this->supabase->updateReport($id, $updateData);
 
             if ($result) {
-                Log::info('API - Report updated successfully', ['report_id' => $id]);
-                
-                return $this->success(
-                    $result,
-                    'Report updated successfully',
-                    200
-                );
-            } else {
-                Log::error('API - Failed to update report');
-                return $this->error('Failed to update report', 500);
+                return $this->success($result, 'Laporan berhasil diupdate', 200);
             }
 
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('API - Validation error:', ['errors' => $e->errors()]);
-            return $this->error('Validation failed', 422, $e->errors());
-            
+            return $this->error('Gagal update ke database', 500);
         } catch (\Exception $e) {
-            Log::error('API - Update report error: ' . $e->getMessage());
-            return $this->error('Server error: ' . $e->getMessage(), 500);
+            return $this->error('Error: ' . $e->getMessage(), 500);
         }
     }
 
-    public function destroy($id): JsonResponse
+    public function destroy(Request $request, $id): JsonResponse
     {
         try {
-            Log::info('API - Delete report started', ['report_id' => $id]);
-
             $report = $this->supabase->getReportById($id);
-            
+
             if (!$report) {
-                return $this->error('Report not found', 404);
+                return $this->error('Laporan tidak ditemukan', 404);
             }
 
-            $user = Session::get('user');
-            if (!$user || $report['user_id'] != $user['id']) {
-                return $this->error('Unauthorized', 403);
+            $userId = $request->current_user_id;
+            if ($report['user_id'] != $userId) {
+                return $this->error('Unauthorized: Dilarang menghapus laporan orang lain', 403);
             }
 
             $result = $this->supabase->deleteReport($id);
 
             if ($result) {
-                Log::info('API - Report deleted successfully', ['report_id' => $id]);
-                
-                return $this->success(
-                    null,
-                    'Report deleted successfully',
-                    200
-                );
+                return $this->success(null, 'Laporan berhasil dihapus', 200);
             } else {
-                Log::error('API - Failed to delete report');
-                return $this->error('Failed to delete report', 500);
+                return $this->error('Gagal menghapus laporan', 500);
             }
-
         } catch (\Exception $e) {
-            Log::error('API - Delete report error: ' . $e->getMessage());
-            return $this->error('Server error: ' . $e->getMessage(), 500);
+            return $this->error('Error: ' . $e->getMessage(), 500);
         }
     }
 
@@ -288,7 +211,7 @@ class ReportApiController extends ApiController
             Log::info('API - Get report edit data', ['report_id' => $id]);
 
             $report = $this->supabase->getReportById($id);
-            
+
             if (!$report) {
                 return $this->error('Report not found', 404);
             }
@@ -308,7 +231,6 @@ class ReportApiController extends ApiController
                 'rooms' => $rooms,
                 'facilities' => $facilities
             ], 'Edit data retrieved successfully', 200);
-
         } catch (\Exception $e) {
             Log::error('API - Get edit data error: ' . $e->getMessage());
             return $this->error('Server error: ' . $e->getMessage(), 500);

@@ -22,16 +22,16 @@ Route::prefix('reports')->group(function () {
     Route::get('facilities', [ReportApiController::class, 'getFacilities']);
 });
 
-// 3. Protected Routes (CRUD Laporan) <--- INI YANG KAMU LEWATKAN
-Route::middleware('api')->prefix('reports')->group(function () {
+Route::middleware(['api', 'supabase.auth'])->prefix('reports')->group(function () {
     // GET /api/reports (List laporan)
-    Route::get('/', [ReportApiController::class, 'index']); 
-    
-    // POST /api/reports (Buat laporan) <--- INI SOLUSI EROR 404 KAMU
-    Route::post('/', [ReportApiController::class, 'store']); 
-    
+    Route::get('/', [ReportApiController::class, 'index']);
+
+    // POST /api/reports (Buat laporan)
+    Route::post('/', [ReportApiController::class, 'store']);
+
     // Detail, Update, Delete
     Route::get('/{id}', [ReportApiController::class, 'show']);
-    Route::post('/{id}', [ReportApiController::class, 'update']); // Pakai POST untuk update file
+    Route::post('/{id}', [ReportApiController::class, 'update']); // Pake POST buat update file
     Route::delete('/{id}', [ReportApiController::class, 'destroy']);
+    Route::get('/{id}/edit', [ReportApiController::class, 'editData']);
 });

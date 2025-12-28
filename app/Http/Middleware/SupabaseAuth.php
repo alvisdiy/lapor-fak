@@ -4,45 +4,37 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Session;
 use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Contracts\Encryption\DecryptException;
 
 class SupabaseAuth
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Closure  $next
-     * @return mixed
-     */
     public function handle(Request $request, Closure $next): Response
     {
-        // DEBUGGING: Log all request details
-        \Log::info('═══ SupabaseAuth Middleware Called ═══');
-        \Log::info('REQUEST DETAILS', [
-            'path' => $request->path(),
-            'url' => $request->url(),
-            'method' => $request->method(),
-            'session_id' => Session::getId(),
-            'has_session_user' => Session::has('user'),
-            'all_session_keys' => array_keys(Session::all()),
-            'user_data' => Session::get('user') ?? 'NULL',
-            'cookies' => $request->cookies->all()
-        ]);
+        // 1. Ambil token dari Header
+        $token = $request->header('Authorization');
 
-        if (!Session::has('user')) {
-            \Log::warning('❌ AUTH FAILED - No user in session!', [
-                'url' => $request->path(),
-                'session_id' => Session::getId()
-            ]);
-            return redirect()->route('login')
-                ->with('error', 'Silakan login terlebih dahulu.');
+        if (!$token) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Header Authorization tidak ditemukan.'
+            ], 401);
         }
+        $token = str_replace('Bearer ', '', $token);
 
-        \Log::info('✅ AUTH SUCCESS - User found in session', [
-            'user_id' => Session::get('user')['id'] ?? 'unknown'
-        ]);
+        try {
+            // 2. DECRYPT TOKEN
+            $userId = Crypt::decryptString($token);
+
+            // 3. Simpan ID asli ke request
+            $request->merge(['current_user_id' => $userId]);
+        } catch (DecryptException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid Token!'
+            ], 401);
+        }
 
         return $next($request);
     }
