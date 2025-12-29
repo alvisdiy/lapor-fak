@@ -5,7 +5,7 @@ LaporFak adalah aplikasi web untuk memudahkan mahasiswa dan staf kampus melapork
 ## Ringkasan
 - **Nama:** LaporFak
 - **Tujuan:** Mempermudah pelaporan, tracking, dan manajemen perbaikan fasilitas kampus.
-- **Backend Framework:** Laravel 11
+- **Backend Framework:** Laravel 10
 - **Database:** Supabase (PostgreSQL)
 - **Frontend:** Blade Templates + Bootstrap / Tailwind
 - **Storage:** Local Storage atau Supabase Storage

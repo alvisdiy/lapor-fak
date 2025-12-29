@@ -7,27 +7,40 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Support\Facades\Session;
 
 class SupabaseAuth
 {
     public function handle(Request $request, Closure $next): Response
     {
-        // 1. Ambil token dari Header
+        if (Session::has('user')) {
+            $user = Session::get('user');
+            if (isset($user->id)) {
+                $request->merge(['current_user_id' => $user->id]);
+            } elseif (is_array($user) && isset($user['id'])) {
+                $request->merge(['current_user_id' => $user['id']]);
+            }
+
+            return $next($request);
+        }
+
         $token = $request->header('Authorization');
 
         if (!$token) {
+            if (!$request->expectsJson()) {
+                return redirect()->route('login')->withErrors(['error' => 'Sesi habis, silakan login kembali.']);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized. Header Authorization tidak ditemukan.'
             ], 401);
         }
+
         $token = str_replace('Bearer ', '', $token);
 
         try {
-            // 2. DECRYPT TOKEN
             $userId = Crypt::decryptString($token);
-
-            // 3. Simpan ID asli ke request
             $request->merge(['current_user_id' => $userId]);
         } catch (DecryptException $e) {
             return response()->json([

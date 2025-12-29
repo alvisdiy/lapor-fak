@@ -62,7 +62,7 @@ class ReportApiController extends ApiController
                 'photos.*'    => 'nullable|image|max:2048',
             ]);
 
-            // 2. Ambil User ID dari Middleware (HASIL PERBAIKAN KITA TADI)
+            // 2. Ambil User ID dari Middleware
             $userId = $request->current_user_id;
             if (!$userId) {
                 return $this->error('Unauthorized: User ID missing', 401);

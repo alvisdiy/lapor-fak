@@ -11,7 +11,7 @@ use App\Http\Controllers\Api\AuthApiController;
 |--------------------------------------------------------------------------
 */
 
-// 1. Route Login & Logout (PENTING: Jangan lupa middleware session di Kernel.php yang saya bilang sebelumnya)
+// 1. Route Login & Logout 
 Route::post('/login', [AuthApiController::class, 'login']);
 Route::post('/logout', [AuthApiController::class, 'logout']);
 
