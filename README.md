@@ -78,4 +78,5 @@ Akses ke: http://localhost:8000
 
 ---
 
-
+# Poster
+![Poster Aplikasi](poster.png)
