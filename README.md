@@ -49,38 +49,14 @@ npm install && npm run build
 
 Copy file `.env.example` menjadi `.env` lalu isi kredensial Supabase dan konfigurasi lain.
 
-Contoh:
 
-```
-SUPABASE_URL=masukkan_url_supabase_disini
-SUPABASE_KEY=masukkan_key_supabase_disini
-DB_CONNECTION=pgsql
-DB_HOST=<supabase_host>
-DB_PORT=5432
-DB_DATABASE=<supabase_db>
-DB_USERNAME=<supabase_user>
-DB_PASSWORD=<supabase_password>
-```
-
-1. Generate application key
+Generate application key
 
 ```bash
 php artisan key:generate
 ```
 
-5. Jalankan migrasi (jika perlu)
-
-```bash
-php artisan migrate
-```
-
-6. (Opsional) Buat symbolic link ke direktorI storage
-
-```bash
-php artisan storage:link
-```
-
-7. Jalankan aplikasi
+Jalankan aplikasi
 
 ```bash
 php artisan serve
