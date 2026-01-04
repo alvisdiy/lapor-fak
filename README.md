@@ -48,7 +48,9 @@ npm install && npm run build
 3. Konfigurasi environment
 
 Copy file `.env.example` menjadi `.env` lalu isi kredensial Supabase dan konfigurasi lain.
-
+```
+cp .env.example .env
+```
 
 Generate application key
 
@@ -63,6 +65,11 @@ php artisan serve
 ```
 
 Akses ke: http://localhost:8000
+
+### Akun Demo (Untuk Login)
+Gunakan akun ini untuk menguji fitur pelaporan:
+- Nama pengguna : Anonim
+- NIM : 2413030000
 
 ## Catatan Penting
 - Pastikan environment memuat kredensial Supabase yang benar agar koneksi database dan storage berfungsi.
