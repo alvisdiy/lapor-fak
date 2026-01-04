@@ -5,7 +5,7 @@ LaporFak adalah aplikasi web untuk memudahkan mahasiswa dan staf kampus melapork
 ## Ringkasan
 - **Nama:** LaporFak
 - **Tujuan:** Mempermudah pelaporan, tracking, dan manajemen perbaikan fasilitas kampus.
-- **Backend Framework:** Laravel 10
+- **Backend Framework:** Laravel 11
 - **Database:** Supabase (PostgreSQL)
 - **Frontend:** Blade Templates + Bootstrap / Tailwind
 - **Storage:** Local Storage atau Supabase Storage
@@ -93,10 +93,12 @@ Akses ke: http://localhost:8000
 - API dilindungi dengan token; jangan membagikan `SUPABASE_KEY` secara publik.
 
 ## Anggota Kelompok
-- Nama Ketua (NIM)
-- Nama Anggota 1 (NIM)
-- Nama Anggota 2 (NIM)
-- Nama Anggota 3 (NIM)
+- 2413030013	Absa Zeta Zetira
+- 2413030097	Alvis Aditya 
+- 2413030075	Anggi Putri Lestari
+- 2413030072	Adinda Rahmayani Putri
+- 2413030079	Divanata Cahyo Saputro
+- 2413030100	Imelda Fitriana Dewi
 
 ---
 
